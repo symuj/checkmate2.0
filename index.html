@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Text Compare — Lilly Internal Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  /* Apply saved theme before any paint. Defaults to dark on first visit. */
+  (function() {
+    try {
+      var saved = localStorage.getItem('lilly-tools:theme:v1');
+      var theme = (saved === 'light' || saved === 'dark') ? saved : 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  })();
+</script>
+<style>
+  /* =========================================================
+     LILLY BRAND TOKENS — LIGHT THEME
+     ========================================================= */
+  :root {
+    --lilly-red: #C8102E;
+    --lilly-red-dark: #A50D26;
+    --lilly-red-soft: rgba(200, 16, 46, 0.06);
+    --lilly-red-glow: rgba(200, 16, 46, 0.18);
+
+    --lilly-gold: #F0AB00;
+    --lilly-blue: #4A90D9;
+    --lilly-green: #00A651;
+
+    /* Neutrals — light */
+    --ink:      #0A0A0A;
+    --ink-2:    #262626;
+    --ink-3:    #525252;
+    --muted:    #737373;
+    --muted-2:  #A3A3A3;
+    --line:     #E5E5E5;
+    --line-2:   #F2F2F2;
+    --bg:       #FAFAFA;
+    --surface:  #FFFFFF;
+    --surface-2:#F4F4F4;
+
+    --bg-glow-1: rgba(200, 16, 46, 0.03);
+    --bg-glow-2: rgba(74, 144, 217, 0.02);
+    --masthead-bg: rgba(250, 250, 250, 0.82);
+
+    /* Diff tokens */
+    --add-bg:    rgba(0, 166, 81, 0.10);
+    --add-text:  #006B35;
+    --add-border:rgba(0, 166, 81, 0.40);
+    --del-bg:    rgba(200, 16, 46, 0.08);
+    --del-text:  var(--lilly-red-dark);
+    --del-border:rgba(200, 16, 46, 0.30);
+
+    --shadow-1: 0 1px 2px rgba(10,10,10,0.04);
+    --shadow-2: 0 2px 8px rgba(10,10,10,0.04), 0 1px 2px rgba(10,10,10,0.04);
+    --shadow-3: 0 8px 24px rgba(10,10,10,0.06), 0 2px 6px rgba(10,10,10,0.04);
+    --shadow-red: 0 4px 16px rgba(200,16,46,0.15);
+
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+  }
+
+  /* =========================================================
+     DARK THEME — warm-graphite (default)
+     ========================================================= */
+  html[data-theme="dark"] {
+    --lilly-red: #E5304F;
+    --lilly-red-dark: #C8102E;
+    --lilly-red-soft: rgba(229, 48, 79, 0.10);
+    --lilly-red-glow: rgba(229, 48, 79, 0.25);
+
+    --lilly-gold: #F4B928;
+    --lilly-blue: #6BA8E8;
+    --lilly-green: #1EBA6B;
+
+    --ink:      #F5F3EF;
+    --ink-2:    #DCD8D2;
+    --ink-3:    #A8A39C;
+    --muted:    #8B8680;
+    --muted-2:  #6A655F;
+    --line:     #2A2826;
+    --line-2:   #1F1D1B;
+    --bg:       #141312;
+    --surface:  #1A1917;
+    --surface-2:#22211F;
+
+    --bg-glow-1: rgba(229, 48, 79, 0.05);
+    --bg-glow-2: rgba(107, 168, 232, 0.03);
+    --masthead-bg: rgba(20, 19, 18, 0.78);
+
+    --add-bg:    rgba(30, 186, 107, 0.14);
+    --add-text:  #4FD89A;
+    --add-border:rgba(30, 186, 107, 0.42);
+    --del-bg:    rgba(229, 48, 79, 0.14);
+    --del-text:  #FF7A8F;
+    --del-border:rgba(229, 48, 79, 0.42);
+
+    --shadow-1: 0 1px 2px rgba(0,0,0,0.35);
+    --shadow-2: 0 2px 8px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.4);
+    --shadow-3: 0 8px 24px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.30);
+    --shadow-red: 0 4px 16px rgba(229,48,79,0.28);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--ink-2);
+    font-family: 'Geist', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'ss01', 'ss03', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(1200px 600px at 100% -10%, var(--bg-glow-1) 0%, transparent 60%),
+      radial-gradient(800px 400px at -10% 110%, var(--bg-glow-2) 0%, transparent 60%);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  ::selection { background: var(--lilly-red); color: #fff; }
+
+  /* Custom scrollbar for the scroll-sync columns */
+  .side-col::-webkit-scrollbar { width: 8px; height: 8px; }
+  .side-col::-webkit-scrollbar-track { background: transparent; }
+  .side-col::-webkit-scrollbar-thumb {
+    background: var(--line); border-radius: 4px;
+  }
+  .side-col::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
+
+  /* =========================================================
+     MASTHEAD
+     ========================================================= */
+  .masthead {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: var(--masthead-bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .masthead-inner {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 32px;
+    padding: 18px 56px;
+    max-width: 1440px; margin: 0 auto;
+  }
+  .masthead-actions {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .logo-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+  }
+  .logo-mark .badge {
+    min-width: 34px; height: 34px;
+    padding: 0 9px;
+    background: var(--lilly-red);
+    color: #fff;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Geist', sans-serif;
+    font-weight: 700;
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    box-shadow: var(--shadow-red);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .logo-mark:hover .badge { transform: scale(1.06); }
+  .logo-mark .marque {
+    font-family: 'Geist', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--ink);
+    letter-spacing: -0.015em;
+  }
+  .logo-mark .marque .accent { color: var(--lilly-red); }
+
+  .masthead-meta {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .masthead-divider {
+    width: 1px; height: 22px;
+    background: var(--line);
+    flex-shrink: 0;
+  }
+
+  /* =========================================================
+     THEME TOGGLE
+     ========================================================= */
+  .theme-toggle {
+    appearance: none; background: transparent; border: none;
+    padding: 0; cursor: pointer;
+    width: 54px; height: 28px;
+    display: inline-flex; align-items: center;
+    flex-shrink: 0;
+  }
+  .theme-toggle-track {
+    position: relative;
+    width: 54px; height: 28px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    transition: background 0.3s ease, border-color 0.2s ease;
+  }
+  .theme-toggle:hover .theme-toggle-track { border-color: var(--ink-3); }
+  .theme-toggle:focus-visible .theme-toggle-track {
+    outline: 2px solid var(--lilly-red); outline-offset: 2px;
+  }
+  .theme-toggle-thumb {
+    position: absolute; top: 2px; left: 2px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--lilly-gold);
+    transition:
+      transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+      background 0.25s ease, color 0.25s ease, border-color 0.2s ease;
+  }
+  html[data-theme="dark"] .theme-toggle-track {
+    background: linear-gradient(135deg, rgba(74,144,217,0.22), rgba(229,48,79,0.18));
+    border-color: var(--ink-3);
+  }
+  html[data-theme="dark"] .theme-toggle-thumb {
+    transform: translateX(26px);
+    background: var(--ink);
+    color: #1E3A6F;
+    border-color: var(--ink-3);
+  }
+  .theme-toggle-icon {
+    width: 13px; height: 13px;
+    position: absolute;
+    transition: opacity 0.2s ease, transform 0.3s ease;
+  }
+  .theme-toggle-sun  { opacity: 1; transform: rotate(0deg) scale(1); }
+  .theme-toggle-moon { opacity: 0; transform: rotate(-90deg) scale(0.6); }
+  html[data-theme="dark"] .theme-toggle-sun  { opacity: 0; transform: rotate(90deg) scale(0.6); }
+  html[data-theme="dark"] .theme-toggle-moon { opacity: 1; transform: rotate(0deg) scale(1); }
+
+  /* =========================================================
+     LAYOUT
+     ========================================================= */
+  main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 48px 56px 80px;
+  }
+
+  /* =========================================================
+     HERO
+     ========================================================= */
+  .hero {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 32px;
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px; font-weight: 500;
+    color: var(--lilly-red);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .eyebrow::before {
+    content: '';
+    width: 28px; height: 1.5px;
+    background: var(--lilly-red);
+  }
+  .hero h1 {
+    font-family: 'Geist', sans-serif;
+    font-weight: 600;
+    font-size: clamp(32px, 4vw, 44px);
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+    color: var(--ink);
+  }
+  .hero h1 .accent {
+    color: var(--lilly-red);
+  }
+  .hero .subtitle {
+    font-size: 15px;
+    color: var(--muted);
+    max-width: 540px;
+    margin-top: 14px;
+    line-height: 1.55;
+  }
+  .hero-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-left: 28px;
+    border-left: 1px solid var(--line);
+  }
+  .hero-legend .label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .legend-row {
+    display: flex; align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+  .legend-swatch {
+    width: 14px; height: 14px;
+    border-radius: 4px;
+    border: 1px solid;
+  }
+  .swatch-add { background: var(--add-bg); border-color: var(--add-border); }
+  .swatch-del { background: var(--del-bg); border-color: var(--del-border); }
+
+  /* =========================================================
+     INPUT GRID
+     ========================================================= */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow-2);
+    transition: box-shadow 0.25s ease, border-color 0.2s ease;
+  }
+  .panel:focus-within {
+    border-color: var(--ink-3);
+    box-shadow: var(--shadow-3);
+  }
+
+  .panel-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .panel-label h2 {
+    font-family: 'Geist', sans-serif;
+    font-weight: 600;
+    font-size: 13.5px;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .panel-label h2::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--lilly-red);
+  }
+  .panel-label .hint {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-family: 'Geist Mono', monospace;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 220px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ink);
+    background: var(--bg);
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  }
+  textarea::placeholder { color: var(--muted-2); }
+  textarea:focus {
+    border-color: var(--lilly-red);
+    background: var(--surface);
+    box-shadow: 0 0 0 3px var(--lilly-red-soft);
+  }
+
+  /* =========================================================
+     ACTIONS
+     ========================================================= */
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 28px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px 18px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    border: 1px solid transparent;
+    letter-spacing: -0.005em;
+    line-height: 1;
+  }
+  .btn svg { width: 14px; height: 14px; }
+  .btn-primary {
+    background: var(--lilly-red); color: #fff;
+    border-color: var(--lilly-red);
+    box-shadow: var(--shadow-red);
+  }
+  .btn-primary:hover {
+    background: var(--lilly-red-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(200,16,46,0.22);
+  }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-ghost {
+    background: transparent; color: var(--ink-2);
+    border-color: var(--line);
+  }
+  .btn-ghost:hover { border-color: var(--ink-3); background: var(--surface-2); }
+
+  .mode-toggle {
+    display: inline-flex;
+    background: var(--surface);
+    padding: 3px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-1);
+    margin-left: auto;
+  }
+  .mode-toggle button {
+    background: transparent; border: none;
+    padding: 7px 16px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 10.5px; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer; border-radius: 999px;
+    transition: all 0.2s ease;
+  }
+  .mode-toggle button:hover { color: var(--ink-2); }
+  .mode-toggle button.active {
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  /* =========================================================
+     RESULT PANEL
+     ========================================================= */
+  .result-panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-2);
+    min-height: 240px;
+    overflow: hidden;
+  }
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--line);
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--surface);
+  }
+  .result-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .result-header h2 {
+    font-family: 'Geist', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .result-header h2::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--lilly-red);
+  }
+  .stats {
+    display: flex;
+    gap: 6px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+  .stat {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 500;
+    border: 1px solid;
+    line-height: 1.4;
+  }
+  .stat-add {
+    color: var(--add-text);
+    background: var(--add-bg);
+    border-color: var(--add-border);
+  }
+  .stat-del {
+    color: var(--del-text);
+    background: var(--del-bg);
+    border-color: var(--del-border);
+  }
+
+  /* Change navigator */
+  .navigator {
+    display: inline-flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px;
+    box-shadow: var(--shadow-1);
+    gap: 0;
+  }
+  .navigator.hidden { display: none; }
+  .nav-btn {
+    appearance: none;
+    background: transparent;
+    border: none;
+    width: 26px; height: 26px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .nav-btn:hover:not(:disabled) {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+  .nav-btn:disabled {
+    color: var(--muted-2);
+    cursor: not-allowed;
+  }
+  .nav-btn svg { width: 13px; height: 13px; }
+  .nav-counter {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-2);
+    padding: 0 10px;
+    min-width: 60px;
+    text-align: center;
+    line-height: 1;
+    letter-spacing: 0.02em;
+  }
+  .nav-counter .nav-current {
+    color: var(--lilly-red);
+    font-weight: 600;
+  }
+
+  .result-body {
+    padding: 26px 28px;
+  }
+
+  .diff-output {
+    font-family: 'Geist Mono', monospace;
+    font-size: 13.5px;
+    line-height: 1.85;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: var(--ink-2);
+  }
+
+  .add {
+    background: var(--add-bg);
+    color: var(--add-text);
+    padding: 2px 5px;
+    border-radius: 4px;
+    border-bottom: 2px solid var(--add-border);
+    font-weight: 500;
+    transition: outline 0.2s ease, box-shadow 0.3s ease;
+  }
+  .del {
+    background: var(--del-bg);
+    color: var(--del-text);
+    padding: 2px 5px;
+    border-radius: 4px;
+    border-bottom: 2px solid var(--del-border);
+    text-decoration: line-through;
+    text-decoration-color: var(--del-text);
+    font-weight: 500;
+    transition: outline 0.2s ease, box-shadow 0.3s ease;
+  }
+
+  /* Focused change — pulse and outline */
+  .add.focused-change,
+  .del.focused-change {
+    outline: 2px solid var(--lilly-red);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px var(--lilly-red-glow);
+    animation: pulse-focus 1s ease-out;
+  }
+  @keyframes pulse-focus {
+    0%   { box-shadow: 0 0 0 0 var(--lilly-red-glow); }
+    50%  { box-shadow: 0 0 0 12px var(--lilly-red-glow); }
+    100% { box-shadow: 0 0 0 6px var(--lilly-red-glow); }
+  }
+
+  /* Empty state — neat, no decoration */
+  .empty-state {
+    text-align: center;
+    padding: 64px 24px;
+  }
+  .empty-state .icon-wrap {
+    width: 48px; height: 48px;
+    margin: 0 auto 20px;
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--ink-3);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .empty-state h3 {
+    font-family: 'Geist', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    margin-bottom: 6px;
+  }
+  .empty-state p {
+    color: var(--muted);
+    font-size: 13.5px;
+    max-width: 380px;
+    margin: 0 auto;
+    line-height: 1.55;
+  }
+  .empty-state .hint-row {
+    margin-top: 22px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .empty-state kbd {
+    color: var(--ink-2);
+    background: var(--surface-2);
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    text-transform: none;
+    letter-spacing: 0;
+    font-family: 'Geist Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  /* =========================================================
+     SIDE-BY-SIDE — with sync scrolling
+     ========================================================= */
+  .side-by-side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 760px) { .side-by-side { grid-template-columns: 1fr; } }
+  .side-col {
+    max-height: 65vh;
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+  .side-col h3 {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    z-index: 1;
+  }
+  .side-col h3::before {
+    content: '';
+    width: 7px; height: 7px;
+    border-radius: 50%;
+  }
+  .side-col.left h3::before { background: var(--del-border); }
+  .side-col.right h3::before { background: var(--add-border); }
+
+  /* =========================================================
+     SHORTCUT HINT BAR (subtle, below result panel)
+     ========================================================= */
+  .shortcuts-hint {
+    margin-top: 16px;
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-family: 'Geist Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .shortcuts-hint span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .shortcuts-hint kbd {
+    color: var(--ink-2);
+    background: var(--surface);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    text-transform: none;
+    letter-spacing: 0;
+    font-family: 'Geist Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  /* =========================================================
+     FOOTER
+     ========================================================= */
+  footer {
+    border-top: 1px solid var(--line);
+  }
+  .footer-inner {
+    max-width: 1440px; margin: 0 auto;
+    padding: 20px 56px;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 720px) {
+    .masthead-inner { padding: 16px 20px; }
+    main { padding: 32px 20px 56px; }
+    .footer-inner { padding: 18px 20px; }
+    .hero { grid-template-columns: 1fr; }
+    .hero-legend { border-left: none; padding-left: 0; border-top: 1px solid var(--line); padding-top: 18px; }
+    .result-header { padding: 16px 18px; }
+    .result-body { padding: 20px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="logo-mark" href="#">
+      <span class="badge">TC</span>
+      <span class="marque">Text <span class="accent">Compare</span></span>
+    </a>
+    <div class="masthead-actions">
+      <span class="masthead-meta">Internal Tools</span>
+      <span class="masthead-divider" aria-hidden="true"></span>
+      <button class="theme-toggle" id="themeToggle" type="button" title="Toggle theme" aria-label="Toggle theme">
+        <span class="theme-toggle-track">
+          <span class="theme-toggle-thumb">
+            <svg class="theme-toggle-icon theme-toggle-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 2v2"/><path d="M12 20v2"/>
+              <path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/>
+              <path d="M2 12h2"/><path d="M20 12h2"/>
+              <path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+            </svg>
+            <svg class="theme-toggle-icon theme-toggle-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+            </svg>
+          </span>
+        </span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <section class="hero">
+    <div>
+      <div class="eyebrow">Design Ops &middot; Copy Review</div>
+      <h1>Compare existing and <span class="accent">updated</span> text</h1>
+      <p class="subtitle">Paste the current text from the design file alongside the new revision. Additions are highlighted in green, deletions in red &mdash; processed locally, never uploaded.</p>
+    </div>
+    <div class="hero-legend">
+      <span class="label">Legend</span>
+      <div class="legend-row"><span class="legend-swatch swatch-add"></span>To add</div>
+      <div class="legend-row"><span class="legend-swatch swatch-del"></span>To delete</div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-label">
+        <h2>Existing text</h2>
+        <span class="hint">From design file</span>
+      </div>
+      <textarea id="existing" placeholder="Paste the current text from the design file here..."></textarea>
+    </div>
+    <div class="panel">
+      <div class="panel-label">
+        <h2>New text</h2>
+        <span class="hint">Received for update</span>
+      </div>
+      <textarea id="updated" placeholder="Paste the new text for the update here..."></textarea>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="compareBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h13"/><path d="m13 3 3 3-3 3"/>
+        <path d="M21 18H8"/><path d="m11 21-3-3 3-3"/>
+      </svg>
+      Compare
+    </button>
+    <button class="btn btn-ghost" id="clearBtn">Clear</button>
+    <button class="btn btn-ghost" id="swapBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m17 3 4 4-4 4"/><path d="M21 7H9"/>
+        <path d="m7 21-4-4 4-4"/><path d="M3 17h12"/>
+      </svg>
+      Swap
+    </button>
+    <div class="mode-toggle">
+      <button class="active" data-mode="unified">Unified</button>
+      <button data-mode="side">Side by side</button>
+    </div>
+  </div>
+
+  <div class="result-panel">
+    <div class="result-header">
+      <div class="result-header-left">
+        <h2>Comparison result</h2>
+        <div class="stats" id="stats"></div>
+      </div>
+      <div class="navigator hidden" id="navigator" role="group" aria-label="Navigate between changes">
+        <button class="nav-btn" id="navPrev" type="button" title="Previous change (K or ↑)" aria-label="Previous change">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+        </button>
+        <span class="nav-counter" id="navCounter"><span class="nav-current">—</span> / <span id="navTotal">—</span></span>
+        <button class="nav-btn" id="navNext" type="button" title="Next change (J or ↓)" aria-label="Next change">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m9 18 6-6-6-6"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="result-body">
+      <div id="output" class="diff-output">
+        <div class="empty-state">
+          <div class="icon-wrap">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 3v4a1 1 0 0 0 1 1h4"/>
+              <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/>
+              <path d="M9 13h6"/><path d="M9 17h4"/>
+            </svg>
+          </div>
+          <h3>Ready to compare</h3>
+          <p>Add your existing and updated text to the panels above, then run a comparison to see the differences.</p>
+          <div class="hint-row">
+            <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to compare
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="shortcuts-hint" id="shortcutsHint" style="display:none;">
+    <span><kbd>J</kbd> next change</span>
+    <span><kbd>K</kbd> previous change</span>
+    <span><kbd>Esc</kbd> clear selection</span>
+  </div>
+
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <span>Company Confidential &copy; 2026 Eli Lilly and Company</span>
+    <span>Word-level diff &middot; Runs locally</span>
+  </div>
+</footer>
+
+<script>
+  // =====================================================
+  // THEME TOGGLE
+  // =====================================================
+  (function() {
+    var btn = document.getElementById('themeToggle');
+    btn.addEventListener('click', function() {
+      var current = document.documentElement.getAttribute('data-theme') || 'dark';
+      var next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('lilly-tools:theme:v1', next); } catch (e) {}
+    });
+  })();
+
+  // =====================================================
+  // DIFF ALGORITHM (LCS, word-level)
+  // =====================================================
+  function tokenize(text) {
+    return text.match(/\w+|\s+|[^\w\s]/g) || [];
+  }
+
+  function diff(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array.from({ length: m + 1 }, () => new Uint32Array(n + 1));
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (a[i - 1] === b[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+        else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+    const ops = [];
+    let i = m, j = n;
+    while (i > 0 && j > 0) {
+      if (a[i - 1] === b[j - 1]) {
+        ops.push({ type: 'equal', value: a[i - 1] });
+        i--; j--;
+      } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+        ops.push({ type: 'delete', value: a[i - 1] });
+        i--;
+      } else {
+        ops.push({ type: 'insert', value: b[j - 1] });
+        j--;
+      }
+    }
+    while (i > 0) { ops.push({ type: 'delete', value: a[i - 1] }); i--; }
+    while (j > 0) { ops.push({ type: 'insert', value: b[j - 1] }); j--; }
+    ops.reverse();
+    return ops;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // =====================================================
+  // GROUP OPS — assign stable IDs to each change group.
+  // Used by both unified and side-by-side renders so the
+  // navigator can target the same logical change regardless
+  // of view mode.
+  // =====================================================
+  function groupOps(ops) {
+    const flat = [];
+    let changeId = 0;
+    let i = 0;
+    while (i < ops.length) {
+      const op = ops[i];
+      if (op.type === 'equal') {
+        flat.push(op);
+        i++;
+      } else {
+        let group = '';
+        const type = op.type;
+        while (i < ops.length && ops[i].type === type) {
+          group += ops[i].value;
+          i++;
+        }
+        if (group.trim() === '') {
+          // Whitespace-only — treat as equal (don't highlight noise)
+          flat.push({ type: 'equal', value: group });
+        } else {
+          flat.push({ type, value: group, id: changeId++ });
+        }
+      }
+    }
+    return { flat, total: changeId };
+  }
+
+  // =====================================================
+  // RENDERERS
+  // =====================================================
+  function renderUnified(flat) {
+    let html = '';
+    for (const op of flat) {
+      if (op.type === 'equal') {
+        html += escapeHtml(op.value);
+      } else {
+        const cls = op.type === 'insert' ? 'add' : 'del';
+        html += `<span class="${cls}" data-change-id="${op.id}">${escapeHtml(op.value)}</span>`;
+      }
+    }
+    return html;
+  }
+
+  function renderSideBySide(flat) {
+    let left = '', right = '';
+    for (const op of flat) {
+      if (op.type === 'equal') {
+        left += escapeHtml(op.value);
+        right += escapeHtml(op.value);
+      } else if (op.type === 'delete') {
+        left += `<span class="del" data-change-id="${op.id}">${escapeHtml(op.value)}</span>`;
+      } else {
+        right += `<span class="add" data-change-id="${op.id}">${escapeHtml(op.value)}</span>`;
+      }
+    }
+    return `
+      <div class="side-by-side">
+        <div class="side-col left" id="sideLeft">
+          <h3>Existing &mdash; to delete</h3>
+          <div>${left}</div>
+        </div>
+        <div class="side-col right" id="sideRight">
+          <h3>New &mdash; to add</h3>
+          <div>${right}</div>
+        </div>
+      </div>`;
+  }
+
+  // =====================================================
+  // APP STATE
+  // =====================================================
+  let currentMode = 'unified';
+  let lastFlat = null;
+  let totalChanges = 0;
+  let currentChangeIndex = -1; // -1 = nothing focused yet
+
+  const existingEl = document.getElementById('existing');
+  const updatedEl = document.getElementById('updated');
+  const outputEl = document.getElementById('output');
+  const statsEl = document.getElementById('stats');
+  const navigatorEl = document.getElementById('navigator');
+  const navPrevBtn = document.getElementById('navPrev');
+  const navNextBtn = document.getElementById('navNext');
+  const navCurrentEl = navigatorEl.querySelector('.nav-current');
+  const navTotalEl = document.getElementById('navTotal');
+  const shortcutsHintEl = document.getElementById('shortcutsHint');
+
+  const emptyStateHtml = `
+    <div class="empty-state">
+      <div class="icon-wrap">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 3v4a1 1 0 0 0 1 1h4"/>
+          <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/>
+          <path d="M9 13h6"/><path d="M9 17h4"/>
+        </svg>
+      </div>
+      <h3>Ready to compare</h3>
+      <p>Add your existing and updated text to the panels above, then run a comparison to see the differences.</p>
+      <div class="hint-row">
+        <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to compare
+      </div>
+    </div>`;
+
+  function resetEmpty() {
+    outputEl.innerHTML = emptyStateHtml;
+    statsEl.innerHTML = '';
+    navigatorEl.classList.add('hidden');
+    shortcutsHintEl.style.display = 'none';
+    lastFlat = null;
+    totalChanges = 0;
+    currentChangeIndex = -1;
+  }
+
+  // =====================================================
+  // CHANGE NAVIGATOR
+  // =====================================================
+  function updateNavigatorUI() {
+    if (totalChanges === 0) {
+      navigatorEl.classList.add('hidden');
+      shortcutsHintEl.style.display = 'none';
+      return;
+    }
+    navigatorEl.classList.remove('hidden');
+    shortcutsHintEl.style.display = 'flex';
+    navTotalEl.textContent = totalChanges;
+    if (currentChangeIndex < 0) {
+      navCurrentEl.textContent = '—';
+    } else {
+      navCurrentEl.textContent = (currentChangeIndex + 1);
+    }
+    navPrevBtn.disabled = totalChanges === 0;
+    navNextBtn.disabled = totalChanges === 0;
+  }
+
+  function clearFocusedChange() {
+    outputEl.querySelectorAll('.focused-change').forEach(el => {
+      el.classList.remove('focused-change');
+    });
+  }
+
+  function focusChange(index) {
+    if (totalChanges === 0) return;
+    // Wrap around
+    index = ((index % totalChanges) + totalChanges) % totalChanges;
+    currentChangeIndex = index;
+
+    clearFocusedChange();
+
+    // Find all elements with this change-id (in side-by-side there's only one;
+    // in unified there's only one too). Highlight them all just in case.
+    const targets = outputEl.querySelectorAll(`[data-change-id="${index}"]`);
+    if (targets.length === 0) return;
+
+    targets.forEach(t => t.classList.add('focused-change'));
+
+    // Scroll the first target into view. If it's inside a side-col, the
+    // sync-scroll handler will mirror it to the other column automatically.
+    const first = targets[0];
+    const scrollContainer = first.closest('.side-col');
+    if (scrollContainer) {
+      // Scroll within the side column
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const elRect = first.getBoundingClientRect();
+      const offset = (elRect.top - containerRect.top)
+                   + scrollContainer.scrollTop
+                   - (scrollContainer.clientHeight / 2)
+                   + (first.offsetHeight / 2);
+      scrollContainer.scrollTo({ top: offset, behavior: 'smooth' });
+    } else {
+      first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    updateNavigatorUI();
+  }
+
+  function nextChange() { focusChange(currentChangeIndex + 1); }
+  function prevChange() { focusChange(currentChangeIndex - 1); }
+
+  navNextBtn.addEventListener('click', nextChange);
+  navPrevBtn.addEventListener('click', prevChange);
+
+  // =====================================================
+  // SYNC SCROLL (side-by-side only)
+  // Uses a "lock" flag so the programmatic scroll on the
+  // mirror column doesn't fire its own scroll listener.
+  // requestAnimationFrame defers the unlock to the next
+  // paint, after the mirrored scrollTop has been applied.
+  // =====================================================
+  let syncScrollLock = null;
+  function setupSyncScroll() {
+    const left = document.getElementById('sideLeft');
+    const right = document.getElementById('sideRight');
+    if (!left || !right) return;
+
+    function bind(source, target) {
+      source.addEventListener('scroll', () => {
+        if (syncScrollLock && syncScrollLock !== source) return;
+        syncScrollLock = source;
+        const denom = source.scrollHeight - source.clientHeight;
+        const ratio = denom > 0 ? source.scrollTop / denom : 0;
+        const targetMax = target.scrollHeight - target.clientHeight;
+        target.scrollTop = ratio * targetMax;
+        requestAnimationFrame(() => { syncScrollLock = null; });
+      });
+    }
+    bind(left, right);
+    bind(right, left);
+  }
+
+  // =====================================================
+  // COMPARE + RENDER
+  // =====================================================
+  function runCompare() {
+    const a = tokenize(existingEl.value);
+    const b = tokenize(updatedEl.value);
+
+    if (a.length === 0 && b.length === 0) {
+      resetEmpty();
+      return;
+    }
+
+    const ops = diff(a, b);
+    const grouped = groupOps(ops);
+    lastFlat = grouped.flat;
+    totalChanges = grouped.total;
+    currentChangeIndex = -1;
+
+    let added = 0, removed = 0;
+    for (const op of lastFlat) {
+      if (op.type === 'insert') added++;
+      else if (op.type === 'delete') removed++;
+    }
+    statsEl.innerHTML = `
+      <span class="stat stat-add">+${added} added</span>
+      <span class="stat stat-del">&minus;${removed} removed</span>
+    `;
+    render();
+    updateNavigatorUI();
+  }
+
+  function render() {
+    if (!lastFlat) return;
+    if (currentMode === 'unified') {
+      outputEl.innerHTML = renderUnified(lastFlat);
+    } else {
+      outputEl.innerHTML = renderSideBySide(lastFlat);
+      setupSyncScroll();
+    }
+    // Restore focus highlight if we were navigating
+    if (currentChangeIndex >= 0) {
+      const targets = outputEl.querySelectorAll(`[data-change-id="${currentChangeIndex}"]`);
+      targets.forEach(t => t.classList.add('focused-change'));
+    }
+  }
+
+  // =====================================================
+  // EVENT LISTENERS
+  // =====================================================
+  document.getElementById('compareBtn').addEventListener('click', runCompare);
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    existingEl.value = '';
+    updatedEl.value = '';
+    resetEmpty();
+  });
+  document.getElementById('swapBtn').addEventListener('click', () => {
+    const tmp = existingEl.value;
+    existingEl.value = updatedEl.value;
+    updatedEl.value = tmp;
+    if (lastFlat) runCompare();
+  });
+  document.querySelectorAll('.mode-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-toggle button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentMode = btn.dataset.mode;
+      render();
+    });
+  });
+
+  // Compare shortcut from inside textareas
+  [existingEl, updatedEl].forEach(el => {
+    el.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        runCompare();
+      }
+    });
+  });
+
+  // Global keyboard shortcuts for navigating changes.
+  // Only active when focus is outside text inputs.
+  document.addEventListener('keydown', (e) => {
+    const active = document.activeElement;
+    const inField = active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT');
+    if (inField) return;
+    if (totalChanges === 0) return;
+
+    if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      nextChange();
+    } else if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      prevChange();
+    } else if (e.key === 'Escape') {
+      clearFocusedChange();
+      currentChangeIndex = -1;
+      updateNavigatorUI();
+    }
+  });
+</script>
+</body>
+</html>
